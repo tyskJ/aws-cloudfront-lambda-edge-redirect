@@ -1,5 +1,5 @@
 # ╔══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗
-# ║ CloudFront Functions redirect Stack - CloudFormation Template                                                                                    ║
+# ║ CloudFront Lambda@Edge redirect Stack - CloudFormation Template                                                                                  ║
 # ╚══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╝
 AWSTemplateFormatVersion: "2010-09-09"
 Description: "Virginia Stack."
@@ -14,7 +14,7 @@ Metadata:
           - Fqdn
 
 # ╔══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗
-# ║ CloudFront Functions redirect Stack - CloudFormation Template Parameters                                                                         ║
+# ║ CloudFront Lambda@Edge redirect Stack - CloudFormation Template Parameters                                                                       ║
 # ╠═══════════════════════════════════════╤═════════════════════════════════════════════════╤════════════════════════════════════════════════════════╣
 # ║ HostedZoneId                          │ AWS::Route53::HostedZone::Id                    │ Public Hosted Zone ID.                                 ║
 # ║ Fqdn                                  │ String                                          │ FQDN.                                                  ║
@@ -31,7 +31,7 @@ Parameters:
     ConstraintDescription: "The domain name must be valid. Example: example.com"
 
 # ╔══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗
-# ║ CloudFront Functions redirect Stack - CloudFormation Template Resources                                                                          ║
+# ║ CloudFront Lambda@Edge redirect Stack - CloudFormation Template Resources                                                                        ║
 # ╠═════════════════════════════════════╤═══════════════════════════════════════════╤════════════════════════════════════════════════════════════════╣
 # ║ CloudFrontCert                      │ AWS::CertificateManager::Certificate      │ ACM Public Certificate.                                        ║
 # ╚═════════════════════════════════════╧═══════════════════════════════════════════╧════════════════════════════════════════════════════════════════╝
@@ -49,7 +49,7 @@ Resources:
           Value: cloudfront-acm-certificate
 
 # ╔══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗
-# ║ CloudFront Functions redirect Stack - CloudFormation Template Outputs                                                                            ║
+# ║ CloudFront Lambda@Edge redirect Stack - CloudFormation Template Outputs                                                                          ║
 # ╠═══════════════════════════╤══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╣
 # ║ CloudFrontCert            │ Certificate ARN for CloudFront.                                                                                      ║
 # ╚═══════════════════════════╧══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╝

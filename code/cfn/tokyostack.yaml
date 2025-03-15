@@ -1,5 +1,5 @@
 # ╔══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗
-# ║ CloudFront Functions redirect Stack - CloudFormation Template                                                                                    ║
+# ║ CloudFront Lambda@Edge redirect Stack - CloudFormation Template                                                                                  ║
 # ╚══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╝
 AWSTemplateFormatVersion: "2010-09-09"
 Description: "Tokyo Stack."
@@ -40,7 +40,7 @@ Metadata:
           - S3BucketName
 
 # ╔══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗
-# ║ CloudFront Functions redirect Stack - CloudFormation Template Parameters                                                                         ║
+# ║ CloudFront Lambda@Edge redirect Stack - CloudFormation Template Parameters                                                                       ║
 # ╠═══════════════════════════════════════╤═════════════════════════════════════════════════╤════════════════════════════════════════════════════════╣
 # ║ VpcCidr                               │ String                                          │ VPC Cidr.                                              ║
 # ║ PublicSubnet1aCidr                    │ String                                          │ Public Subnet AZ-A Cidr.                               ║
@@ -124,7 +124,7 @@ Parameters:
     ConstraintDescription: "Check Reference URL: https://docs.aws.amazon.com/ja_jp/AmazonS3/latest/userguide/bucketnamingrules.html"
 
 # ╔══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗
-# ║ CloudFront Functions redirect Stack - CloudFormation Template Mappings                                                                           ║
+# ║ CloudFront Lambda@Edge redirect Stack - CloudFormation Template Mappings                                                                         ║
 # ╠═════════════════════╤════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╣
 # ║ VpcParams           │ VPC Paramters.                                                                                                             ║
 # ║ IgwParams           │ Internet Gateway Paramters.                                                                                                ║
@@ -235,7 +235,7 @@ Mappings:
       DefaultActionTargetGroupName: TargetGroup
 
 # ╔══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗
-# ║ CloudFront Functions redirect Stack - CloudFormation Template Resources                                                                          ║
+# ║ CloudFront Lambda@Edge redirect Stack - CloudFormation Template Resources                                                                        ║
 # ╠═════════════════════════════════════╤═══════════════════════════════════════════╤════════════════════════════════════════════════════════════════╣
 # ║ Vpc                                 │ AWS::EC2::VPC                             │ VPC.                                                           ║
 # ║ Igw                                 │ AWS::EC2::InternetGateway                 │ InternetGateway.                                               ║
@@ -279,7 +279,6 @@ Mappings:
 # ║ AlbAcm                              │ AWS::CertificateManager::Certificate      │ ACM Public Certificate.                                        ║
 # ║ Bucket                              │ AWS::S3::Bucket                           │ S3 Bucket for Redirect.                                        ║
 # ║ OriginAccessControl                 │ AWS::CloudFront::OriginAccessControl      │ OAC.                                                           ║
-# ║ CloudFrontFunctions                 │ AWS::CloudFront::Function                 │ CloudFront Functions.                                          ║
 # ║ Distribution                        │ AWS::CloudFront::Distribution             │ CloudFront Distribution.                                       ║
 # ║ CloudFrontRecordSet                 │ AWS::Route53::RecordSet                   │ Alias RecordSet for CloudFront.                                ║
 # ║ BucketPolicy                        │ AWS::S3::BucketPolicy                     │ S3 Bucket Policy.                                              ║
@@ -737,43 +736,6 @@ Resources:
         SigningProtocol: sigv4
         SigningBehavior: always
 
-  CloudFrontFunctions:
-    Type: AWS::CloudFront::Function
-    Properties:
-      Name: cf-functions-redirect
-      AutoPublish: true
-      FunctionConfig:
-        Comment: redirect function
-        Runtime: cloudfront-js-2.0
-      FunctionCode: !Sub |
-        function handler(event) {
-          var request = event.request;
-          var uri = request.uri;
-          var newurl = `https://${FqdnForAlb}/`;
-
-          // Check uri
-          if (uri === '/test1/'){
-            newurl = `https://${FqdnForAlb}/test1/`;
-          }
-          // Check uri
-          else if (uri === '/test2/'){
-            newurl = `https://${FqdnForAlb}/test2/`;
-          }
-          else {
-            return request;
-          }
-          var response = {
-            statusCode: 301,
-            statusDescription: 'Moved Permanently',
-            headers: {
-              location: {
-                "value": newurl,
-              },
-            },
-          };
-          return response;
-        }
-
   Distribution:
     Type: AWS::CloudFront::Distribution
     Properties:
@@ -791,9 +753,6 @@ Resources:
           ViewerProtocolPolicy: redirect-to-https
           ForwardedValues:
             QueryString: false
-          FunctionAssociations:
-            - EventType: viewer-request
-              FunctionARN: !GetAtt CloudFrontFunctions.FunctionARN
         CustomErrorResponses:
           - ErrorCachingMinTTL: 10
             ErrorCode: 404
