@@ -1,0 +1,61 @@
+# ╔══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗
+# ║ CloudFront Functions redirect Stack - CloudFormation Template                                                                                    ║
+# ╚══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╝
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Virginia Stack."
+
+Metadata:
+  AWS::Cloudformation::Interface:
+    ParameterGroups:
+      - Label:
+          default: DNS Settings.
+        Parameters:
+          - HostedZoneId
+          - Fqdn
+
+# ╔══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗
+# ║ CloudFront Functions redirect Stack - CloudFormation Template Parameters                                                                         ║
+# ╠═══════════════════════════════════════╤═════════════════════════════════════════════════╤════════════════════════════════════════════════════════╣
+# ║ HostedZoneId                          │ AWS::Route53::HostedZone::Id                    │ Public Hosted Zone ID.                                 ║
+# ║ Fqdn                                  │ String                                          │ FQDN.                                                  ║
+# ╚═══════════════════════════════════════╧═════════════════════════════════════════════════╧════════════════════════════════════════════════════════╝
+Parameters:
+  HostedZoneId:
+    Description: HostedZone ID for CloudFront Validation Certificate.
+    Type: AWS::Route53::HostedZone::Id
+
+  Fqdn:
+    Description: FQDN for issue CloudFront Certificate Domain Name.
+    Type: String
+    AllowedPattern: "^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\\.[a-zA-Z]{2,})+\\.?$"
+    ConstraintDescription: "The domain name must be valid. Example: example.com"
+
+# ╔══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗
+# ║ CloudFront Functions redirect Stack - CloudFormation Template Resources                                                                          ║
+# ╠═════════════════════════════════════╤═══════════════════════════════════════════╤════════════════════════════════════════════════════════════════╣
+# ║ CloudFrontCert                      │ AWS::CertificateManager::Certificate      │ ACM Public Certificate.                                        ║
+# ╚═════════════════════════════════════╧═══════════════════════════════════════════╧════════════════════════════════════════════════════════════════╝
+Resources:
+  CloudFrontCert:
+    Type: AWS::CertificateManager::Certificate
+    Properties:
+      DomainName: !Ref Fqdn
+      DomainValidationOptions:
+        - DomainName: !Ref Fqdn
+          HostedZoneId: !Ref HostedZoneId
+      ValidationMethod: DNS
+      Tags:
+        - Key: Name
+          Value: cloudfront-acm-certificate
+
+# ╔══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗
+# ║ CloudFront Functions redirect Stack - CloudFormation Template Outputs                                                                            ║
+# ╠═══════════════════════════╤══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╣
+# ║ CloudFrontCert            │ Certificate ARN for CloudFront.                                                                                      ║
+# ╚═══════════════════════════╧══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╝
+Outputs:
+  CloudFrontCert:
+    Description: Certificate ARN for CloudFront.
+    Value: !Ref CloudFrontCert
+    Export:
+      Name: cloudfront-acm-certificate

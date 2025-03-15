@@ -1,0 +1,847 @@
+# ╔══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗
+# ║ CloudFront Functions redirect Stack - CloudFormation Template                                                                                    ║
+# ╚══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╝
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Tokyo Stack."
+Transform:
+  - "AWS::LanguageExtensions"
+
+Metadata:
+  AWS::Cloudformation::Interface:
+    ParameterGroups:
+      - Label:
+          default: NW Settings.
+        Parameters:
+          - VpcCidr
+          - PublicSubnet1aCidr
+          - PublicSubnet1cCidr
+          - PrivateSubnet1aCidr
+          - PrivateSubnet1cCidr
+      - Label:
+          default: EC2 Settings.
+        Parameters:
+          - LatestAmiId
+          - InstanceType
+          - RootVolumeSize
+      - Label:
+          default: ALB Domain Settings.
+        Parameters:
+          - HostedZoneIdForAlb
+          - FqdnForAlb
+      - Label:
+          default: CloudFront Domain Settings.
+        Parameters:
+          - HostedZoneIdForCloudFront
+          - FqdnForCloudFront
+          - CertArnForCloudFront
+      - Label:
+          default: S3 Settings.
+        Parameters:
+          - S3BucketName
+
+# ╔══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗
+# ║ CloudFront Functions redirect Stack - CloudFormation Template Parameters                                                                         ║
+# ╠═══════════════════════════════════════╤═════════════════════════════════════════════════╤════════════════════════════════════════════════════════╣
+# ║ VpcCidr                               │ String                                          │ VPC Cidr.                                              ║
+# ║ PublicSubnet1aCidr                    │ String                                          │ Public Subnet AZ-A Cidr.                               ║
+# ║ PublicSubnet1cCidr                    │ String                                          │ Public Subnet AZ-C Cidr.                               ║
+# ║ PrivateSubnet1aCidr                   │ String                                          │ Private Subnet AZ-A Cidr.                              ║
+# ║ PrivateSubnet1cCidr                   │ String                                          │ Private Subnet AZ-C Cidr.                              ║
+# ║ LatestAmiId                           │ AWS::SSM::Parameter::Value<AWS::EC2::Image::Id> │ Latest Amazon Linux 2023 Ami ID.                       ║
+# ║ InstanceType                          │ String                                          │ Instance Type.                                         ║
+# ║ RootVolumeSize                        │ Number                                          │ RootVolumeSize.                                        ║
+# ║ HostedZoneIdForAlb                    │ AWS::Route53::HostedZone::Id                    │ Public Hosted Zone ID.                                 ║
+# ║ FqdnForAlb                            │ String                                          │ FQDN.                                                  ║
+# ║ HostedZoneIdForCloudFront             │ AWS::Route53::HostedZone::Id                    │ Public Hosted Zone ID.                                 ║
+# ║ FqdnForCloudFront                     │ String                                          │ FQDN.                                                  ║
+# ║ CertArnForCloudFront                  │ String                                          │ Certificate ARN.                                       ║
+# ║ S3BucketName                          │ String                                          │ S3 Bucket Name.                                        ║
+# ╚═══════════════════════════════════════╧═════════════════════════════════════════════════╧════════════════════════════════════════════════════════╝
+Parameters:
+  VpcCidr:
+    Description: VPC Cidr
+    Type: String
+
+  PublicSubnet1aCidr:
+    Description: Public Subnet AZ-A Cidr
+    Type: String
+
+  PublicSubnet1cCidr:
+    Description: Public Subnet AZ-C Cidr
+    Type: String
+
+  PrivateSubnet1aCidr:
+    Description: Private Subnet AZ-A Cidr
+    Type: String
+
+  PrivateSubnet1cCidr:
+    Description: Private Subnet AZ-C Cidr
+    Type: String
+
+  LatestAmiId:
+    Description: Latest Amazon Linux 2023 AMI ID.
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64
+
+  InstanceType:
+    Description: EC2 Instance Type.
+    Type: String
+
+  RootVolumeSize:
+    Description: EC2 Instance Root Volume Size.
+    Type: Number
+
+  HostedZoneIdForAlb:
+    Description: HostedZone ID for ALB Validation Certificate.
+    Type: AWS::Route53::HostedZone::Id
+
+  FqdnForAlb:
+    Description: FQDN for issue ALB Certificate Domain Name.
+    Type: String
+    AllowedPattern: "^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\\.[a-zA-Z]{2,})+\\.?$"
+    ConstraintDescription: "The domain name must be valid. Example: example.com"
+
+  HostedZoneIdForCloudFront:
+    Description: HostedZone ID for CloudFront issue Alias Record.
+    Type: AWS::Route53::HostedZone::Id
+
+  FqdnForCloudFront:
+    Description: FQDN for CloudFront Alias Name(alternative domain name).
+    Type: String
+    AllowedPattern: "^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\\.[a-zA-Z]{2,})+\\.?$"
+    ConstraintDescription: "The domain name must be valid. Example: example.com"
+
+  CertArnForCloudFront:
+    Description: Certificate ARN for CloudFront.
+    Type: String
+    AllowedPattern: "^arn:aws:[a-z0-9-]+:us-east-1:\\d{12}:[a-zA-Z0-9/_-]+$"
+    ConstraintDescription: "Check Certificate ARN issued from us-east-1."
+
+  S3BucketName:
+    Description: S3 Bucket Name for CloudFront Origin.
+    Type: String
+    AllowedPattern: "^(?!xn--|sthree(?:-configurator|-)|amzn-s3-demo-)(?!.*[.]{2})(?!.*\\d+\\.\\d+\\.\\d+\\.\\d+$)(?!.*-s3alias$)(?!.*--ol-s3$)(?!.*\\.mrap$)(?!.*--x-s3$)(?!.*\\..*)[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$"
+    ConstraintDescription: "Check Reference URL: https://docs.aws.amazon.com/ja_jp/AmazonS3/latest/userguide/bucketnamingrules.html"
+
+# ╔══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗
+# ║ CloudFront Functions redirect Stack - CloudFormation Template Mappings                                                                           ║
+# ╠═════════════════════╤════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╣
+# ║ VpcParams           │ VPC Paramters.                                                                                                             ║
+# ║ IgwParams           │ Internet Gateway Paramters.                                                                                                ║
+# ║ SubnetParams        │ Subnet Paramters.                                                                                                          ║
+# ║ NaclParams          │ NACL Paramters.                                                                                                            ║
+# ║ RtbParams           │ RouteTable Paramters.                                                                                                      ║
+# ║ IamParams           │ IAM Paramters.                                                                                                             ║
+# ║ SgParams            │ SecurityGroup Paramters.                                                                                                   ║
+# ║ EpParams            │ VPC Interface Endpoint Paramters.                                                                                          ║
+# ║ KeyPairParams       │ KeyPair Paramters.                                                                                                         ║
+# ║ Ec2Params           │ EC2 Instance Paramters.                                                                                                    ║
+# ║ ElbParams           │ ELB Paramters.                                                                                                             ║
+# ╚═════════════════════╧════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╝
+Mappings:
+  VpcParams:
+    VpcType:
+      Name: vpc
+      DnsHost: true
+      DnsSupport: true
+      Cidr: VpcCidr
+  IgwParams:
+    IgwType:
+      Name: igw
+  SubnetParams:
+    PublicSubnet1a:
+      Name: public-subnet-a
+      Cidr: PublicSubnet1aCidr
+    PublicSubnet1c:
+      Name: public-subnet-c
+      Cidr: PublicSubnet1cCidr
+    PrivateSubnet1a:
+      Name: private-subnet-a
+      Cidr: PrivateSubnet1aCidr
+    PrivateSubnet1c:
+      Name: private-subnet-c
+      Cidr: PrivateSubnet1cCidr
+  NaclParams:
+    NaclType:
+      Name: nacl
+    Association:
+      AssocSubnet1: PublicSubnet1a
+      AssocSubnet2: PublicSubnet1c
+      AssocSubnet3: PrivateSubnet1a
+      AssocSubnet4: PrivateSubnet1c
+  RtbParams:
+    RtbType:
+      RtbPublic: public-rtb
+      RtbPrivate: private-rtb
+    PublicAssociation:
+      RtbAssocPublicSubnet1: PublicSubnet1a
+      RtbAssocPublicSubnet2: PublicSubnet1c
+    PrivateAssociation:
+      RtbAssocPrivateSubnet1: PrivateSubnet1a
+      RtbAssocPrivateSubnet2: PrivateSubnet1c
+  IamParams:
+    IamType:
+      Description: IAM Role for EC2 Instance.
+      Name: iam-role-ec2
+  SgParams:
+    SgType:
+      AlbSg: alb-sg
+      Ec2Sg: ec2-sg
+      EpSg: vpcep-sg
+  EpParams:
+    EpType:
+      Ssm: ssm
+      SsmMessages: ssmmessages
+      Ec2Messages: ec2messages
+  KeyPairParams:
+    KeyPairType:
+      Name: keypair
+  Ec2Params:
+    Instance1:
+      Name: ec2-instance
+      AmiId: LatestAmiId
+      InstanceType: InstanceType
+      RootVolumeSize: RootVolumeSize
+      SgName: Ec2Sg
+      SubnetName: PrivateSubnet1a
+      DeviceName: /dev/xvda
+      KeyPairName: KeyPair
+  ElbParams:
+    TargetGroupType:
+      Name: alb-targetgroup
+      ReceiveProtocol: HTTP
+      ReceivePort: 80
+      CheckInterval: 10
+      CheckPath: /index.html
+      CheckPort: 80
+      CheckProtocol: HTTP
+      CheckTimeout: 5
+      CheckThresholdHealthy: 3
+      CheckThresholdUnhealthy: 3
+      CheckMatcher: 200
+    AlbType:
+      Name: alb
+      Type: application
+      SgName: AlbSg
+      Scheme: internet-facing
+      DeleteProtection: false
+      SubnetName1: PublicSubnet1a
+      SubnetName2: PublicSubnet1c
+    ListenerType:
+      Protocol: HTTPS
+      Port: 443
+      LbName: Alb
+      DefaultActionType: forward
+      DefaultActionTargetGroupName: TargetGroup
+
+# ╔══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗
+# ║ CloudFront Functions redirect Stack - CloudFormation Template Resources                                                                          ║
+# ╠═════════════════════════════════════╤═══════════════════════════════════════════╤════════════════════════════════════════════════════════════════╣
+# ║ Vpc                                 │ AWS::EC2::VPC                             │ VPC.                                                           ║
+# ║ Igw                                 │ AWS::EC2::InternetGateway                 │ InternetGateway.                                               ║
+# ║ IgwAttach                           │ AWS::EC2::VPCGatewayAttachment            │ InternetGateway Attachment.                                    ║
+# ║ PublicSubnet1a                      │ AWS::EC2::Subnet                          │ Public Subnet AZ-A.                                            ║
+# ║ PublicSubnet1c                      │ AWS::EC2::Subnet                          │ Public Subnet AZ-A.                                            ║
+# ║ PrivateSubnet1a                     │ AWS::EC2::Subnet                          │ Private Subnet AZ-A.                                           ║
+# ║ PrivateSubnet1c                     │ AWS::EC2::Subnet                          │ Private Subnet AZ-C.                                           ║
+# ║ Nacl                                │ AWS::EC2::NetworkAcl                      │ All Allow NACL.                                                ║
+# ║ NaclInEntry100                      │ AWS::EC2::NetworkAclEntry                 │ All Allow Inbound Entry.                                       ║
+# ║ NaclOutEntry100                     │ AWS::EC2::NetworkAclEntry                 │ All Allow Outbound Entry.                                      ║
+# ║ AssocSubnet1                        │ AWS::EC2::SubnetNetworkAclAssociation     │ NACL Association.                                              ║
+# ║ AssocSubnet2                        │ AWS::EC2::SubnetNetworkAclAssociation     │ NACL Association.                                              ║
+# ║ AssocSubnet3                        │ AWS::EC2::SubnetNetworkAclAssociation     │ NACL Association.                                              ║
+# ║ AssocSubnet4                        │ AWS::EC2::SubnetNetworkAclAssociation     │ NACL Association.                                              ║
+# ║ RtbPublic                           │ AWS::EC2::RouteTable                      │ Public Subnet RouteTable.                                      ║
+# ║ RtbPrivate                          │ AWS::EC2::RouteTable                      │ Private Subnet RouteTable.                                     ║
+# ║ RtbAssocPublicSubnet1               │ AWS::EC2::SubnetRouteTableAssociation     │ RouteTable Association Public Subnet.                          ║
+# ║ RtbAssocPublicSubnet2               │ AWS::EC2::SubnetRouteTableAssociation     │ RouteTable Association Public Subnet.                          ║
+# ║ RtbAssocPrivateSubnet1              │ AWS::EC2::SubnetRouteTableAssociation     │ RouteTable Association Private Subnet.                         ║
+# ║ RtbAssocPrivateSubnet2              │ AWS::EC2::SubnetRouteTableAssociation     │ RouteTable Association Private Subnet.                         ║
+# ║ S3GwEp                              │ AWS::EC2::VPCEndpoint                     │ S3 Gateway Endpoint.                                           ║
+# ║ RtbPublicEntry1                     │ AWS::EC2::Route                           │ RouteTable Entry 1.                                            ║
+# ║ Role                                │ AWS::IAM::Role                            │ EC2 IAM Role.                                                  ║
+# ║ InstanceProfile                     │ AWS::IAM::InstanceProfile                 │ EC2 IAM InstanceProfile.                                       ║
+# ║ AlbSg                               │ AWS::EC2::SecurityGroup                   │ ALB SecurityGroup.                                             ║
+# ║ Ec2Sg                               │ AWS::EC2::SecurityGroup                   │ EC2 SecurityGroup.                                             ║
+# ║ EpSg                                │ AWS::EC2::SecurityGroup                   │ VPC Interface Endpoint SecurityGroup.                          ║
+# ║ AlbSgIngress01                      │ AWS::EC2::SecurityGroupIngress            │ ALB SG Allow HTTPS from ALL.                                   ║
+# ║ Ec2SgIngress01                      │ AWS::EC2::SecurityGroupIngress            │ EC2 SG Allow HTTP from ALB SG.                                 ║
+# ║ EpSgIngress01                       │ AWS::EC2::SecurityGroupIngress            │ VPC Interface Endpoint SG Allow HTTPS from EC2 SG.             ║
+# ║ SsmEp                               │ AWS::EC2::VPCEndpoint                     │ SSM Interface VPC Endpoint.                                    ║
+# ║ SsmMessagesEp                       │ AWS::EC2::VPCEndpoint                     │ SSMMessagesInterface VPC Endpoint.                             ║
+# ║ Ec2MessagesEp                       │ AWS::EC2::VPCEndpoint                     │ EC2Messages Interface VPC Endpoint.                            ║
+# ║ KeyPair                             │ AWS::EC2::KeyPair                         │ KeyPair.                                                       ║
+# ║ Ec2Instance                         │ AWS::EC2::Instance                        │ EC2 Instance.                                                  ║
+# ║ TargetGroup                         │ AWS::ElasticLoadBalancingV2::TargetGroup  │ TargetGroup.                                                   ║
+# ║ Alb                                 │ AWS::ElasticLoadBalancingV2::LoadBalancer │ ALB.                                                           ║
+# ║ Listener                            │ AWS::ElasticLoadBalancingV2::Listener     │ Listener.                                                      ║
+# ║ AlbRecordSet                        │ AWS::Route53::RecordSet                   │ Alias RecordSet for ALB.                                       ║
+# ║ AlbAcm                              │ AWS::CertificateManager::Certificate      │ ACM Public Certificate.                                        ║
+# ║ Bucket                              │ AWS::S3::Bucket                           │ S3 Bucket for Redirect.                                        ║
+# ║ OriginAccessControl                 │ AWS::CloudFront::OriginAccessControl      │ OAC.                                                           ║
+# ║ CloudFrontFunctions                 │ AWS::CloudFront::Function                 │ CloudFront Functions.                                          ║
+# ║ Distribution                        │ AWS::CloudFront::Distribution             │ CloudFront Distribution.                                       ║
+# ║ CloudFrontRecordSet                 │ AWS::Route53::RecordSet                   │ Alias RecordSet for CloudFront.                                ║
+# ║ BucketPolicy                        │ AWS::S3::BucketPolicy                     │ S3 Bucket Policy.                                              ║
+# ╚═════════════════════════════════════╧═══════════════════════════════════════════╧════════════════════════════════════════════════════════════════╝
+Resources:
+  Vpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref
+        "Fn::FindInMap": [VpcParams, VpcType, Cidr]
+      EnableDnsHostnames: !FindInMap [VpcParams, VpcType, DnsHost]
+      EnableDnsSupport: !FindInMap [VpcParams, VpcType, DnsSupport]
+      Tags:
+        - Key: Name
+          Value: !FindInMap [VpcParams, VpcType, Name]
+
+  Igw:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !FindInMap [IgwParams, IgwType, Name]
+
+  IgwAttach:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref Vpc
+      InternetGatewayId: !Ref Igw
+
+  "Fn::ForEach::SubnetAzA":
+    - SubnetType
+    - [PublicSubnet1a, PrivateSubnet1a]
+    - ${SubnetType}:
+        Type: AWS::EC2::Subnet
+        Properties:
+          VpcId: !Ref Vpc
+          CidrBlock: !Ref
+            "Fn::FindInMap": [SubnetParams, !Ref SubnetType, Cidr]
+          AvailabilityZone: !Sub ${AWS::Region}a
+          Tags:
+            - Key: Name
+              Value: !FindInMap [SubnetParams, !Ref SubnetType, Name]
+
+  "Fn::ForEach::SubnetAzC":
+    - SubnetType
+    - [PublicSubnet1c, PrivateSubnet1c]
+    - ${SubnetType}:
+        Type: AWS::EC2::Subnet
+        Properties:
+          VpcId: !Ref Vpc
+          CidrBlock: !Ref
+            "Fn::FindInMap": [SubnetParams, !Ref SubnetType, Cidr]
+          AvailabilityZone: !Sub ${AWS::Region}c
+          Tags:
+            - Key: Name
+              Value: !FindInMap [SubnetParams, !Ref SubnetType, Name]
+
+  Nacl:
+    Type: AWS::EC2::NetworkAcl
+    Properties:
+      VpcId: !Ref Vpc
+      Tags:
+        - Key: Name
+          Value: !FindInMap [NaclParams, NaclType, Name]
+
+  NaclInEntry100:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      Egress: false
+      RuleNumber: 100
+      RuleAction: allow
+      Protocol: -1
+      CidrBlock: 0.0.0.0/0
+      NetworkAclId: !Ref Nacl
+
+  NaclOutEntry100:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      Egress: true
+      RuleNumber: 100
+      RuleAction: allow
+      Protocol: -1
+      CidrBlock: 0.0.0.0/0
+      NetworkAclId: !Ref Nacl
+
+  "Fn::ForEach::NaclAssociation":
+    - SubnetAssocNacl
+    - [AssocSubnet1, AssocSubnet2, AssocSubnet3, AssocSubnet4]
+    - ${SubnetAssocNacl}:
+        Type: AWS::EC2::SubnetNetworkAclAssociation
+        Properties:
+          SubnetId: !Ref
+            "Fn::FindInMap": [NaclParams, Association, !Ref SubnetAssocNacl]
+          NetworkAclId: !Ref Nacl
+
+  "Fn::ForEach::RouteTable":
+    - RtbVariable
+    - [RtbPublic, RtbPrivate]
+    - ${RtbVariable}:
+        Type: AWS::EC2::RouteTable
+        Properties:
+          VpcId: !Ref Vpc
+          Tags:
+            - Key: Name
+              Value: !FindInMap [RtbParams, RtbType, !Ref RtbVariable]
+
+  "Fn::ForEach::RtbAssocPublicSubnet":
+    - AssocVariable
+    - [RtbAssocPublicSubnet1, RtbAssocPublicSubnet2]
+    - ${AssocVariable}:
+        Type: AWS::EC2::SubnetRouteTableAssociation
+        Properties:
+          RouteTableId: !Ref RtbPublic
+          SubnetId: !Ref
+            "Fn::FindInMap": [RtbParams, PublicAssociation, !Ref AssocVariable]
+
+  "Fn::ForEach::RtbAssocPrivateSubnet":
+    - AssocVariable
+    - [RtbAssocPrivateSubnet1, RtbAssocPrivateSubnet2]
+    - ${AssocVariable}:
+        Type: AWS::EC2::SubnetRouteTableAssociation
+        Properties:
+          RouteTableId: !Ref RtbPrivate
+          SubnetId: !Ref
+            "Fn::FindInMap": [RtbParams, PrivateAssociation, !Ref AssocVariable]
+
+  S3GwEp:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref Vpc
+      VpcEndpointType: Gateway
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.s3
+      RouteTableIds:
+        - !Ref RtbPublic
+        - !Ref RtbPrivate
+
+  RtbPublicEntry1:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      RouteTableId: !Ref RtbPublic
+      GatewayId: !Ref Igw
+
+  Role:
+    Type: AWS::IAM::Role
+    Properties:
+      Description: !FindInMap [IamParams, IamType, Description]
+      RoleName: !FindInMap [IamParams, IamType, Name]
+      AssumeRolePolicyDocument:
+        {
+          "Version": "2012-10-17",
+          "Statement":
+            [
+              {
+                "Effect": "Allow",
+                "Principal": { "Service": ["ec2.amazonaws.com"] },
+                "Action": "sts:AssumeRole",
+              },
+            ],
+        }
+      ManagedPolicyArns:
+        - !Sub arn:${AWS::Partition}:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Tags:
+        - Key: Name
+          Value: !FindInMap [IamParams, IamType, Name]
+
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref Role
+      InstanceProfileName: !FindInMap [IamParams, IamType, Name]
+
+  "Fn::ForEach::SecurityGroup":
+    - SgVariable
+    - [AlbSg, Ec2Sg, EpSg]
+    - ${SgVariable}:
+        Type: AWS::EC2::SecurityGroup
+        Properties:
+          GroupDescription: !Ref SgVariable
+          GroupName: !FindInMap [SgParams, SgType, !Ref SgVariable]
+          VpcId: !Ref Vpc
+          Tags:
+            - Key: Name
+              Value: !FindInMap [SgParams, SgType, !Ref SgVariable]
+
+  AlbSgIngress01:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      Description: Allow HTTPS from All.
+      GroupId: !Ref AlbSg
+      IpProtocol: tcp
+      FromPort: 443
+      ToPort: 443
+      CidrIp: 0.0.0.0/0
+
+  Ec2SgIngress01:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      Description: Allow HTTP from ALB SG.
+      GroupId: !Ref Ec2Sg
+      IpProtocol: tcp
+      FromPort: 80
+      ToPort: 80
+      SourceSecurityGroupId: !Ref AlbSg
+
+  EpSgIngress01:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      Description: Allow HTTPS from EC2 SG.
+      GroupId: !Ref EpSg
+      IpProtocol: tcp
+      FromPort: 443
+      ToPort: 443
+      SourceSecurityGroupId: !Ref Ec2Sg
+
+  "Fn::ForEach::VpcEndpoint":
+    - EpVariable
+    - [Ssm, SsmMessages, Ec2Messages]
+    - ${EpVariable}Ep:
+        Type: AWS::EC2::VPCEndpoint
+        Properties:
+          ServiceName: !Sub
+            - com.amazonaws.${AWS::Region}.${service}
+            - service: !FindInMap [EpParams, EpType, !Ref EpVariable]
+          VpcId: !Ref Vpc
+          SubnetIds:
+            - !Ref PrivateSubnet1c
+          SecurityGroupIds:
+            - !Ref EpSg
+          PrivateDnsEnabled: true
+          VpcEndpointType: Interface
+
+  KeyPair:
+    Type: AWS::EC2::KeyPair
+    Properties:
+      KeyName: !FindInMap [KeyPairParams, KeyPairType, Name]
+      KeyType: rsa
+      KeyFormat: pem
+      Tags:
+        - Key: Name
+          Value: !FindInMap [KeyPairParams, KeyPairType, Name]
+
+  Ec2Instance:
+    Type: AWS::EC2::Instance
+    DependsOn:
+      - SsmEp
+      - SsmMessagesEp
+      - Ec2MessagesEp
+      - S3GwEp
+      - EpSgIngress01
+    Properties:
+      BlockDeviceMappings:
+        - DeviceName: !FindInMap [Ec2Params, Instance1, DeviceName]
+          Ebs:
+            DeleteOnTermination: true
+            Encrypted: true
+            VolumeSize: !Ref
+              "Fn::FindInMap": [Ec2Params, Instance1, RootVolumeSize]
+            VolumeType: gp3
+      DisableApiTermination: false
+      EbsOptimized: false
+      IamInstanceProfile: !Ref InstanceProfile
+      ImageId: !Ref
+        "Fn::FindInMap": [Ec2Params, Instance1, AmiId]
+      InstanceType: !Ref
+        "Fn::FindInMap": [Ec2Params, Instance1, InstanceType]
+      KeyName: !Ref
+        "Fn::FindInMap": [Ec2Params, Instance1, KeyPairName]
+      SecurityGroupIds:
+        - !Ref
+          "Fn::FindInMap": [Ec2Params, Instance1, SgName]
+      SubnetId: !Ref
+        "Fn::FindInMap": [Ec2Params, Instance1, SubnetName]
+      UserData:
+        Fn::Base64: |
+          #!/bin/bash
+          dnf update -y
+          dnf install -y httpd
+
+          # index.html を作成
+          cat <<EOF > /var/www/html/index.html
+          <!DOCTYPE html>
+          <html lang="ja">
+          <head>
+              <meta charset="UTF-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <title>EC2</title>
+          </head>
+          <body>
+              <h1>EC2 Default Page!</h1>
+          </body>
+          </html>
+          EOF
+
+          # test1.html を作成
+          cat <<EOF > /var/www/html/test1.html
+          <!DOCTYPE html>
+          <html lang="ja">
+          <head>
+              <meta charset="UTF-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <title>EC2</title>
+          </head>
+          <body>
+              <h1>Web Server Test1 Page!</h1>
+          </body>
+          </html>
+          EOF
+
+          # test2.html を作成
+          cat <<EOF > /var/www/html/test2.html
+          <!DOCTYPE html>
+          <html lang="ja">
+          <head>
+              <meta charset="UTF-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <title>EC2</title>
+          </head>
+          <body>
+              <h1>Web Server Test2 Page!</h1>
+          </body>
+          </html>
+          EOF
+
+          # Apache Alias 設定を作成
+          cat <<EOF > /etc/httpd/conf.d/custom-alias.conf
+          Alias /test1/ /var/www/html/test1.html
+          Alias /test2/ /var/www/html/test2.html
+
+          <Directory "/var/www/html">
+              Require all granted
+          </Directory>
+          EOF
+
+          # Apache を有効化 & 再起動
+          systemctl enable --now httpd
+          systemctl restart httpd
+      Tags:
+        - Key: Name
+          Value: !FindInMap [Ec2Params, Instance1, Name]
+
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !FindInMap [ElbParams, TargetGroupType, Name]
+      VpcId: !Ref Vpc
+      Protocol: !FindInMap [ElbParams, TargetGroupType, ReceiveProtocol]
+      Port: !FindInMap [ElbParams, TargetGroupType, ReceivePort]
+      HealthCheckEnabled: true
+      HealthCheckIntervalSeconds:
+        !FindInMap [ElbParams, TargetGroupType, CheckInterval]
+      HealthCheckPath: !FindInMap [ElbParams, TargetGroupType, CheckPath]
+      HealthCheckPort: !FindInMap [ElbParams, TargetGroupType, CheckPort]
+      HealthCheckProtocol:
+        !FindInMap [ElbParams, TargetGroupType, CheckProtocol]
+      HealthCheckTimeoutSeconds:
+        !FindInMap [ElbParams, TargetGroupType, CheckTimeout]
+      HealthyThresholdCount:
+        !FindInMap [ElbParams, TargetGroupType, CheckThresholdHealthy]
+      UnhealthyThresholdCount:
+        !FindInMap [ElbParams, TargetGroupType, CheckThresholdUnhealthy]
+      Matcher:
+        HttpCode: !FindInMap [ElbParams, TargetGroupType, CheckMatcher]
+      Targets:
+        - Id: !Ref Ec2Instance
+      TargetGroupAttributes:
+        - Key: load_balancing.algorithm.type
+          Value: least_outstanding_requests
+      Tags:
+        - Key: Name
+          Value: !FindInMap [ElbParams, TargetGroupType, Name]
+
+  Alb:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !FindInMap [ElbParams, AlbType, Name]
+      Type: !FindInMap [ElbParams, AlbType, Type]
+      Scheme: !FindInMap [ElbParams, AlbType, Scheme]
+      LoadBalancerAttributes:
+        - Key: deletion_protection.enabled
+          Value: !FindInMap [ElbParams, AlbType, DeleteProtection]
+      SecurityGroups:
+        - !Ref
+          "Fn::FindInMap": [ElbParams, AlbType, SgName]
+      Subnets:
+        - !Ref
+          "Fn::FindInMap": [ElbParams, AlbType, SubnetName1]
+        - !Ref
+          "Fn::FindInMap": [ElbParams, AlbType, SubnetName2]
+      Tags:
+        - Key: Name
+          Value: !FindInMap [ElbParams, AlbType, Name]
+
+  Listener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      Protocol: !FindInMap [ElbParams, ListenerType, Protocol]
+      Port: !FindInMap [ElbParams, ListenerType, Port]
+      Certificates:
+        - CertificateArn: !Ref AlbAcm
+      LoadBalancerArn: !Ref
+        "Fn::FindInMap": [ElbParams, ListenerType, LbName]
+      DefaultActions:
+        - Type: !FindInMap [ElbParams, ListenerType, DefaultActionType]
+          TargetGroupArn: !Ref
+            "Fn::FindInMap":
+              [ElbParams, ListenerType, DefaultActionTargetGroupName]
+
+  AlbRecordSet:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref HostedZoneIdForAlb
+      Name: !Ref FqdnForAlb
+      Type: A
+      AliasTarget:
+        DNSName: !GetAtt Alb.DNSName
+        HostedZoneId: !GetAtt Alb.CanonicalHostedZoneID
+        EvaluateTargetHealth: true
+
+  AlbAcm:
+    Type: AWS::CertificateManager::Certificate
+    Properties:
+      DomainName: !Ref FqdnForAlb
+      DomainValidationOptions:
+        - DomainName: !Ref FqdnForAlb
+          HostedZoneId: !Ref HostedZoneIdForAlb
+      ValidationMethod: DNS
+      Tags:
+        - Key: Name
+          Value: acm-certificate
+
+  Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Ref S3BucketName
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - BucketKeyEnabled: true
+            ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        IgnorePublicAcls: true
+        BlockPublicPolicy: true
+        RestrictPublicBuckets: true
+
+  OriginAccessControl:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: cf-oac-for-s3
+        Description: For S3 Origin
+        OriginAccessControlOriginType: s3
+        SigningProtocol: sigv4
+        SigningBehavior: always
+
+  CloudFrontFunctions:
+    Type: AWS::CloudFront::Function
+    Properties:
+      Name: cf-functions-redirect
+      AutoPublish: true
+      FunctionConfig:
+        Comment: redirect function
+        Runtime: cloudfront-js-2.0
+      FunctionCode: !Sub |
+        function handler(event) {
+          var request = event.request;
+          var uri = request.uri;
+          var newurl = `https://${FqdnForAlb}/`;
+
+          // Check uri
+          if (uri === '/test1/'){
+            newurl = `https://${FqdnForAlb}/test1/`;
+          }
+          // Check uri
+          else if (uri === '/test2/'){
+            newurl = `https://${FqdnForAlb}/test2/`;
+          }
+          else {
+            return request;
+          }
+          var response = {
+            statusCode: 301,
+            statusDescription: 'Moved Permanently',
+            headers: {
+              location: {
+                "value": newurl,
+              },
+            },
+          };
+          return response;
+        }
+
+  Distribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        DefaultRootObject: index.html
+        Origins:
+          - Id: !Ref Bucket
+            DomainName: !GetAtt Bucket.RegionalDomainName
+            OriginAccessControlId: !GetAtt OriginAccessControl.Id
+            S3OriginConfig:
+              OriginAccessIdentity: !Ref AWS::NoValue
+        DefaultCacheBehavior:
+          TargetOriginId: !Ref Bucket
+          ViewerProtocolPolicy: redirect-to-https
+          ForwardedValues:
+            QueryString: false
+          FunctionAssociations:
+            - EventType: viewer-request
+              FunctionARN: !GetAtt CloudFrontFunctions.FunctionARN
+        CustomErrorResponses:
+          - ErrorCachingMinTTL: 10
+            ErrorCode: 404
+            ResponseCode: 200
+            ResponsePagePath: /error.html
+        Aliases:
+          - !Ref FqdnForCloudFront
+        ViewerCertificate:
+          AcmCertificateArn: !Ref CertArnForCloudFront
+          SslSupportMethod: sni-only
+
+  CloudFrontRecordSet:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref HostedZoneIdForCloudFront
+      Name: !Ref FqdnForCloudFront
+      Type: A
+      AliasTarget:
+        DNSName: !GetAtt Distribution.DomainName
+        HostedZoneId: Z2FDTNDATAQYW2
+        EvaluateTargetHealth: true
+
+  BucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref Bucket
+      PolicyDocument:
+        {
+          "Version": "2012-10-17",
+          "Statement":
+            [
+              {
+                "Sid": "AllowCloudFrontServicePrincipal",
+                "Effect": "Allow",
+                "Principal": { "Service": "cloudfront.amazonaws.com" },
+                "Action": "s3:GetObject",
+                "Resource":
+                  [{ "Fn::Sub": "arn:${AWS::Partition}:s3:::${Bucket}/*" }],
+                "Condition":
+                  {
+                    "StringEquals":
+                      {
+                        "AWS:SourceArn":
+                          {
+                            "Fn::Sub": "arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${Distribution}",
+                          },
+                      },
+                  },
+              },
+            ],
+        }

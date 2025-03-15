@@ -1,0 +1,10 @@
+Parameters:
+  # NW Setting
+  VpcCidr: 10.0.0.0/16
+  PublicSubnet1aCidr: 10.0.1.0/24
+  PublicSubnet1cCidr: 10.0.2.0/24
+  PrivateSubnet1aCidr: 10.0.3.0/24
+  PrivateSubnet1cCidr: 10.0.4.0/24
+  # EC2 Setting
+  InstanceType: t3.large
+  RootVolumeSize: 30
