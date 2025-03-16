@@ -33,3 +33,14 @@ module "web" {
   alb_fqdn          = var.alb_fqdn
   alb_cert_arn      = module.acm.alb_cert_arn
 }
+
+module "cloudfront_s3" {
+  source     = "../modules/cloudfront_s3"
+  depends_on = [module.acm]
+
+  bucket_name            = var.bucket_name
+  alb_fqdn               = var.alb_fqdn
+  cloudfront_cert_arn    = module.acm.cloudfront_cert_arn
+  cloudfront_hostzone_id = var.cloudfront_hostzone_id
+  cloudfront_fqdn        = var.cloudfront_fqdn
+}
