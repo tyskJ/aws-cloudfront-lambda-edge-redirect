@@ -105,6 +105,7 @@
 
 .. code-block:: bash
 
+  # terraform state rm <リソースタイプ>.<リソース名>
   terraform state rm aws_lambda_function.lambda_function
 
 2. 環境削除
