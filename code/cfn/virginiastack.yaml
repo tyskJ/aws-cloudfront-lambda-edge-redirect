@@ -61,6 +61,7 @@ Parameters:
 # ║ Distribution                        │ AWS::CloudFront::Distribution             │ CloudFront Distribution.                                       ║
 # ║ CloudFrontRecordSet                 │ AWS::Route53::RecordSet                   │ Alias RecordSet for CloudFront.                                ║
 # ║ BucketPolicy                        │ AWS::S3::BucketPolicy                     │ S3 Bucket Policy.                                              ║
+# ║ IamPolicy                           │ AWS::IAM::ManagedPolicy                   │ IAM Managed Policy for Lambda@Edge.                            ║
 # ╚═════════════════════════════════════╧═══════════════════════════════════════════╧════════════════════════════════════════════════════════════════╝
 Resources:
   CloudFrontCert:
@@ -149,6 +150,41 @@ Resources:
                           },
                       },
                   },
+              },
+            ],
+        }
+
+  IamPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      Description: Managed Policy for Lambda@Edge about Logs.
+      ManagedPolicyName: iam-policy-for-lambdaedge-logs
+      PolicyDocument:
+        {
+          "Version": "2012-10-17",
+          "Statement":
+            [
+              {
+                "Sid": "AllowCreateLogGroup",
+                "Effect": "Allow",
+                "Action": ["logs:CreateLogGroup"],
+                "Resource":
+                  [
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:logs:*:${AWS::AccountId}:*",
+                    },
+                  ],
+              },
+              {
+                "Sid": "AllowPutLogEvents",
+                "Effect": "Allow",
+                "Action": ["logs:CreateLogStream", "logs:PutLogEvents"],
+                "Resource":
+                  [
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:logs:*:${AWS::AccountId}:log-group:/aws/lambda/us-east-1*",
+                    },
+                  ],
               },
             ],
         }
