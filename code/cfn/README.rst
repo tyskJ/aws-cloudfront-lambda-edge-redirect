@@ -81,7 +81,18 @@
   PYTHONUTF8=1
   export PYTHONUTF8
 
-4. アーティファクト(Lambda関数コード)をS3にアップロード
+4. リダイレクト先ホスト名修正
+---------------------------------------------------------------------
+* コード内のリダイレクト先FQDNを修正
+
+.. code-block:: Python3
+  if request_path == '/test1/':
+      redirect_url = 'https://リダイレクト先FQDN/test1/'
+  else if request_path == '/test2/':
+      redirect_url = 'https://リダイレクト先FQDN/test2/'
+
+
+5. アーティファクト(Lambda関数コード)をS3にアップロード
 ---------------------------------------------------------------------
 .. code-block:: bash
 
@@ -90,7 +101,7 @@
   --s3-bucket cfn-$DATE-useast1 \
   --output-template-file virginiastack-out.yaml --profile admin
 
-5. *virginiastack* デプロイ
+6. *virginiastack* デプロイ
 ---------------------------------------------------------------------
 .. code-block:: bash
 
