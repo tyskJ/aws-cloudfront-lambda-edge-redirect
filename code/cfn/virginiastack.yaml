@@ -8,54 +8,147 @@ Metadata:
   AWS::Cloudformation::Interface:
     ParameterGroups:
       - Label:
-          default: DNS Settings.
+          default: CloudFront Domain Settings.
         Parameters:
-          - HostedZoneId
-          - Fqdn
+          - HostedZoneIdForCloudFront
+          - FqdnForCloudFront
+      - Label:
+          default: S3 Settings.
+        Parameters:
+          - BucketName
+          - BucketArn
+          - BucketRegionalDomainName
 
 # ╔══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗
 # ║ CloudFront Lambda@Edge redirect Stack - CloudFormation Template Parameters                                                                       ║
 # ╠═══════════════════════════════════════╤═════════════════════════════════════════════════╤════════════════════════════════════════════════════════╣
-# ║ HostedZoneId                          │ AWS::Route53::HostedZone::Id                    │ Public Hosted Zone ID.                                 ║
-# ║ Fqdn                                  │ String                                          │ FQDN.                                                  ║
+# ║ HostedZoneIdForCloudFront             │ AWS::Route53::HostedZone::Id                    │ Public Hosted Zone ID.                                 ║
+# ║ FqdnForCloudFront                     │ String                                          │ FQDN.                                                  ║
+# ║ BucketName                            │ String                                          │ Bucket Name.                                           ║
+# ║ BucketArn                             │ String                                          │ Bucket Arn.                                            ║
+# ║ BucketRegionalDomainName              │ String                                          │ Bucket Regional Domain Name.                           ║
 # ╚═══════════════════════════════════════╧═════════════════════════════════════════════════╧════════════════════════════════════════════════════════╝
 Parameters:
-  HostedZoneId:
+  HostedZoneIdForCloudFront:
     Description: HostedZone ID for CloudFront Validation Certificate.
     Type: AWS::Route53::HostedZone::Id
 
-  Fqdn:
+  FqdnForCloudFront:
     Description: FQDN for issue CloudFront Certificate Domain Name.
     Type: String
     AllowedPattern: "^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\\.[a-zA-Z]{2,})+\\.?$"
     ConstraintDescription: "The domain name must be valid. Example: example.com"
 
+  BucketName:
+    Description: S3 Bucket Name for CloudFront Origin.
+    Type: String
+    AllowedPattern: "^(?!xn--|sthree(?:-configurator|-)|amzn-s3-demo-)(?!.*[.]{2})(?!.*\\d+\\.\\d+\\.\\d+\\.\\d+$)(?!.*-s3alias$)(?!.*--ol-s3$)(?!.*\\.mrap$)(?!.*--x-s3$)(?!.*\\..*)[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$"
+    ConstraintDescription: "Check Reference URL: https://docs.aws.amazon.com/ja_jp/AmazonS3/latest/userguide/bucketnamingrules.html"
+
+  BucketArn:
+    Description: S3 Bucket ARN for CloudFront Origin.
+    Type: String
+
+  BucketRegionalDomainName:
+    Description: S3 Bucket Regional Domain Name for CloudFront Origin.
+    Type: String
+
 # ╔══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗
 # ║ CloudFront Lambda@Edge redirect Stack - CloudFormation Template Resources                                                                        ║
 # ╠═════════════════════════════════════╤═══════════════════════════════════════════╤════════════════════════════════════════════════════════════════╣
 # ║ CloudFrontCert                      │ AWS::CertificateManager::Certificate      │ ACM Public Certificate.                                        ║
+# ║ OriginAccessControl                 │ AWS::CloudFront::OriginAccessControl      │ OAC.                                                           ║
+# ║ Distribution                        │ AWS::CloudFront::Distribution             │ CloudFront Distribution.                                       ║
+# ║ CloudFrontRecordSet                 │ AWS::Route53::RecordSet                   │ Alias RecordSet for CloudFront.                                ║
+# ║ BucketPolicy                        │ AWS::S3::BucketPolicy                     │ S3 Bucket Policy.                                              ║
 # ╚═════════════════════════════════════╧═══════════════════════════════════════════╧════════════════════════════════════════════════════════════════╝
 Resources:
   CloudFrontCert:
     Type: AWS::CertificateManager::Certificate
     Properties:
-      DomainName: !Ref Fqdn
+      DomainName: !Ref FqdnForCloudFront
       DomainValidationOptions:
-        - DomainName: !Ref Fqdn
-          HostedZoneId: !Ref HostedZoneId
+        - DomainName: !Ref FqdnForCloudFront
+          HostedZoneId: !Ref HostedZoneIdForCloudFront
       ValidationMethod: DNS
       Tags:
         - Key: Name
           Value: cloudfront-acm-certificate
 
-# ╔══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗
-# ║ CloudFront Lambda@Edge redirect Stack - CloudFormation Template Outputs                                                                          ║
-# ╠═══════════════════════════╤══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╣
-# ║ CloudFrontCert            │ Certificate ARN for CloudFront.                                                                                      ║
-# ╚═══════════════════════════╧══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╝
-Outputs:
-  CloudFrontCert:
-    Description: Certificate ARN for CloudFront.
-    Value: !Ref CloudFrontCert
-    Export:
-      Name: cloudfront-acm-certificate
+  OriginAccessControl:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: cf-oac-for-s3
+        Description: For S3 Origin
+        OriginAccessControlOriginType: s3
+        SigningProtocol: sigv4
+        SigningBehavior: always
+
+  Distribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        DefaultRootObject: index.html
+        Origins:
+          - Id: !Ref BucketName
+            DomainName: !Ref BucketRegionalDomainName
+            OriginAccessControlId: !GetAtt OriginAccessControl.Id
+            S3OriginConfig:
+              OriginAccessIdentity: !Ref AWS::NoValue
+        DefaultCacheBehavior:
+          TargetOriginId: !Ref BucketName
+          ViewerProtocolPolicy: redirect-to-https
+          ForwardedValues:
+            QueryString: false
+        CustomErrorResponses:
+          - ErrorCachingMinTTL: 10
+            ErrorCode: 404
+            ResponseCode: 200
+            ResponsePagePath: /error.html
+        Aliases:
+          - !Ref FqdnForCloudFront
+        ViewerCertificate:
+          AcmCertificateArn: !Ref CloudFrontCert
+          SslSupportMethod: sni-only
+
+  CloudFrontRecordSet:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref HostedZoneIdForCloudFront
+      Name: !Ref FqdnForCloudFront
+      Type: A
+      AliasTarget:
+        DNSName: !GetAtt Distribution.DomainName
+        HostedZoneId: Z2FDTNDATAQYW2
+        EvaluateTargetHealth: true
+
+  BucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref BucketName
+      PolicyDocument:
+        {
+          "Version": "2012-10-17",
+          "Statement":
+            [
+              {
+                "Sid": "AllowCloudFrontServicePrincipal",
+                "Effect": "Allow",
+                "Principal": { "Service": "cloudfront.amazonaws.com" },
+                "Action": "s3:GetObject",
+                "Resource": [{ "Fn::Sub": "${BucketArn}/*" }],
+                "Condition":
+                  {
+                    "StringEquals":
+                      {
+                        "AWS:SourceArn":
+                          {
+                            "Fn::Sub": "arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${Distribution}",
+                          },
+                      },
+                  },
+              },
+            ],
+        }
