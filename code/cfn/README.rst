@@ -89,7 +89,7 @@
 
   if request_path == '/test1/':
       redirect_url = 'https://リダイレクト先FQDN/test1/'
-  else if request_path == '/test2/':
+  elif request_path == '/test2/':
       redirect_url = 'https://リダイレクト先FQDN/test2/'
 
 
