@@ -307,7 +307,7 @@ resource "aws_instance" "ec2_instance" {
   }
   subnet_id              = aws_subnet.subnet["private-subnet-a"].id
   vpc_security_group_ids = [aws_security_group.ec2_sg.id]
-  user_data              = file("${path.module}/sh/userdata.sh")
+  user_data              = file("${path.module}/assets/userdata.sh")
   tags = {
     Name = var.ec2_map.name
   }
