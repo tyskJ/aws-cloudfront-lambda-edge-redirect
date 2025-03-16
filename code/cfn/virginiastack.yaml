@@ -60,6 +60,7 @@ Parameters:
 # ╠═════════════════════════════════════╤═══════════════════════════════════════════╤════════════════════════════════════════════════════════════════╣
 # ║ IamPolicy                           │ AWS::IAM::ManagedPolicy                   │ IAM Managed Policy for Lambda@Edge.                            ║
 # ║ IamRole                             │ AWS::IAM::Role                            │ IAM Role for Lambda@Edge.                                      ║
+# ║ EdgeFunction                        │ AWS::Serverless::Function                 │ Lambda@Edge Function.                                          ║
 # ║ CloudFrontCert                      │ AWS::CertificateManager::Certificate      │ ACM Public Certificate.                                        ║
 # ║ OriginAccessControl                 │ AWS::CloudFront::OriginAccessControl      │ OAC.                                                           ║
 # ║ Distribution                        │ AWS::CloudFront::Distribution             │ CloudFront Distribution.                                       ║
@@ -126,6 +127,19 @@ Resources:
             ],
         }
 
+  EdgeFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      AutoPublishAlias: prd
+      Description: Lambda@Edge Function for Redirect.
+      CodeUri: src/handlers/redirect
+      FunctionName: lambda-redirect
+      Handler: redirect.lambda_handler
+      Role: !GetAtt IamRole.Arn
+      Runtime: python3.12
+      Tags:
+        Name: lambda-redirect
+
   CloudFrontCert:
     Type: AWS::CertificateManager::Certificate
     Properties:
@@ -165,6 +179,9 @@ Resources:
           ViewerProtocolPolicy: redirect-to-https
           ForwardedValues:
             QueryString: false
+          LambdaFunctionAssociations:
+            - EventType: viewer-request
+              LambdaFunctionARN: !Ref EdgeFunction.Version
         CustomErrorResponses:
           - ErrorCachingMinTTL: 10
             ErrorCode: 404
