@@ -1,0 +1,19 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AllowCreateLogGroup",
+      "Effect": "Allow",
+      "Action": ["logs:CreateLogGroup"],
+      "Resource": ["arn:${Partition}:logs:*:${AccountId}:*"]
+    },
+    {
+      "Sid": "AllowPutLogEvents",
+      "Effect": "Allow",
+      "Action": ["logs:CreateLogStream", "logs:PutLogEvents"],
+      "Resource": [
+        "arn:${Partition}:logs:*:${AccountId}:log-group:/aws/lambda/us-east-1*"
+      ]
+    }
+  ]
+}
