@@ -85,7 +85,7 @@
 ---------------------------------------------------------------------
 * コード内のリダイレクト先FQDNを修正
 
-.. code-block:: Python3
+.. code-block:: python
   if request_path == '/test1/':
       redirect_url = 'https://リダイレクト先FQDN/test1/'
   else if request_path == '/test2/':
