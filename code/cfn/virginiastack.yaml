@@ -129,6 +129,8 @@ Resources:
 
   EdgeFunction:
     Type: AWS::Serverless::Function
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Delete
     Properties:
       AutoPublishAlias: prd
       Description: Lambda@Edge Function for Redirect.
