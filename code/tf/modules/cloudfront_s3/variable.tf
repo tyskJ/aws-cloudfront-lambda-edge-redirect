@@ -6,6 +6,7 @@
 # ║ cloudfront_cert_arn              │ string                            │ CloudFront Certificate ARN.                                               ║
 # ║ cloudfront_hostzone_id           │ string                            │ Hostzone id.                                                              ║
 # ║ cloudfront_fqdn                  │ string                            │ CloudFront FQDN.                                                          ║
+# ║ lambda_arn                       │ string                            │ Lambda@Edge Arn.                                                          ║
 # ╚══════════════════════════════════╧═══════════════════════════════════╧═══════════════════════════════════════════════════════════════════════════╝
 
 variable "bucket_name" {
@@ -32,4 +33,9 @@ variable "cloudfront_hostzone_id" {
 variable "cloudfront_fqdn" {
   type        = string
   description = "CloudFront FQDN."
+}
+
+variable "lambda_arn" {
+  type        = string
+  description = "Lambda@Edge ARN."
 }

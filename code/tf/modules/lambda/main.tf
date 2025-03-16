@@ -4,6 +4,7 @@
 # ║ lambda_policy                      │ aws_iam_policy                                      │ IAM Role for Lambda@Edge logs.                        ║
 # ║ lambda_role                        │ aws_iam_role                                        │ IAM Role for Lambda@Edge.                             ║
 # ║ attach                             │ aws_iam_role_policy_attachment                      │ Attach cwlogs policy attach to Lambda role.           ║
+# ║ lambda_function                    │ aws_lambda_function                                 │ Lambda Function.                                      ║
 # ╚════════════════════════════════════╧═════════════════════════════════════════════════════╧═══════════════════════════════════════════════════════╝
 
 resource "aws_iam_policy" "lambda_policy" {
@@ -30,4 +31,18 @@ resource "aws_iam_role" "lambda_role" {
 resource "aws_iam_role_policy_attachment" "attach" {
   role       = aws_iam_role.lambda_role.name
   policy_arn = aws_iam_policy.lambda_policy.arn
+}
+
+resource "aws_lambda_function" "lambda_function" {
+  provider         = aws.global
+  filename         = data.archive_file.lambda_code.output_path
+  function_name    = "lambda-redirect"
+  role             = aws_iam_role.lambda_role.arn
+  handler          = "redirect.lambda_handler"
+  source_code_hash = data.archive_file.lambda_code.output_base64sha256
+  runtime          = "python3.12"
+  publish          = true
+  tags = {
+    Name = "lambda-redirect"
+  }
 }

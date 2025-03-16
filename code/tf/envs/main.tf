@@ -3,6 +3,7 @@
 # ╠═════════════════╤═══════════════════════════════════╤════════════════════════════════════════════════════════════════════════════════════════════╣
 # ║ acm             │ ../modules/acm                    │ invoke acm module.                                                                         ║
 # ║ web             │ ../modules/web                    │ invoke web module.                                                                         ║
+# ║ lambda          │ ../modules/lambda                 │ invoke lambda module.                                                                      ║
 # ║ cloudfront_s3   │ ../modules/cloudfront_s3          │ invoke cloudfront and S3 module.                                                           ║
 # ╚═════════════════╧═══════════════════════════════════╧════════════════════════════════════════════════════════════════════════════════════════════╝
 
@@ -34,6 +35,16 @@ module "web" {
   alb_cert_arn      = module.acm.alb_cert_arn
 }
 
+module "lambda" {
+  source = "../modules/lambda"
+
+  partition = local.partition_name
+  accountid = local.account_id
+  providers = {
+    aws.global = aws.virginia
+  }
+}
+
 module "cloudfront_s3" {
   source     = "../modules/cloudfront_s3"
   depends_on = [module.acm]
@@ -43,4 +54,5 @@ module "cloudfront_s3" {
   cloudfront_cert_arn    = module.acm.cloudfront_cert_arn
   cloudfront_hostzone_id = var.cloudfront_hostzone_id
   cloudfront_fqdn        = var.cloudfront_fqdn
+  lambda_arn             = module.lambda.qualified_arn
 }

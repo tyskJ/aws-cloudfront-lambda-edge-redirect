@@ -69,6 +69,10 @@ resource "aws_cloudfront_distribution" "distribution" {
     viewer_protocol_policy = "redirect-to-https"
     allowed_methods        = ["GET", "HEAD"]
     cached_methods         = ["GET", "HEAD"]
+    lambda_function_association {
+      event_type = "viewer-request"
+      lambda_arn = var.lambda_arn
+    }
     forwarded_values {
       query_string = false
       cookies {
