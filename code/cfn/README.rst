@@ -88,7 +88,6 @@
   aws cloudformation package \
   --template-file virginiastack.yaml \
   --s3-bucket cfn-$DATE-useast1 \
-  --region us-east-1 \
   --output-template-file virginiastack-out.yaml --profile admin
 
 5. *virginiastack* デプロイ
