@@ -46,23 +46,7 @@
 
 実作業 - ローカル -
 =====================================================================
-1. *virginiastack* デプロイ
----------------------------------------------------------------------
-.. code-block:: bash
-
-  rain deploy virginiastack.yaml VIRGINIASTACK \
-  --s3-bucket cfn-$DATE-useast1 \
-  --region us-east-1 --profile admin
-
-* 以下プロンプトより入力
-
-.. csv-table::
-
-  "Parameter", "概要", "入力値"
-  "HostedZoneId", "Route 53 Public Hosted Zoneに登録しているドメインのHosted zone ID", "ご自身が所有するパブリックホストゾーンID（CloudFront用証明書のCNAMEレコード登録先）"
-  "Fqdn", "CloudFrontのAliasレコードを登録するときのFQDN", "CloudFront用証明書のドメイン名"
-
-2. *tokyostack* デプロイ
+1. *tokyostack* デプロイ
 ---------------------------------------------------------------------
 .. code-block:: bash
 
@@ -78,12 +62,10 @@
   "LatestAmiId", "AmazonLinux2023最新AMIID", "何も入力せずEnter"
   "HostedZoneIdForAlb", "Route 53 Public Hosted Zoneに登録しているドメインのHosted zone ID", "ご自身が所有するパブリックホストゾーンID（ALBのAliasレコード及び証明書CNAMEレコード登録先）"
   "FqdnForAlb", "ALBのAliasレコードを登録するときのFQDN", "ご自身で登録したいFQDN"
-  "HostedZoneIdForCloudFront", "Route 53 Public Hosted Zoneに登録しているドメインのHosted zone ID", "ご自身が所有するパブリックホストゾーンID（CloudFrontのAliasレコード登録先）"
-  "FqdnForCloudFront", "CloudFrontのAliasレコードを登録するときのFQDN", "ご自身で登録したいFQDN"
-  "CertArnForCloudFront", "CloudFront用証明書ARN", "virginiastackデプロイ時に表示されたARN"
   "S3BucketName", "S3バケット名", "CloudFrontのオリジン用S3バケット名"
 
-3. HTMLファイルアップロード
+
+2. HTMLファイルアップロード
 ---------------------------------------------------------------------
 * *index.html*, *error.html* をS3バケットにアップロード
 
@@ -92,6 +74,24 @@
   aws s3 cp index.html s3://デプロイしたS3バケット名 --profile admin
   aws s3 cp error.html s3://デプロイしたS3バケット名 --profile admin
 
+3. *virginiastack* デプロイ
+---------------------------------------------------------------------
+.. code-block:: bash
+
+  rain deploy virginiastack.yaml VIRGINIASTACK \
+  --s3-bucket cfn-$DATE-useast1 \
+  --region us-east-1 --profile admin
+
+* 以下プロンプトより入力
+
+.. csv-table::
+
+  "Parameter", "概要", "入力値"
+  "HostedZoneIdForCloudFront", "Route 53 Public Hosted Zoneに登録しているドメインのHosted zone ID", "ご自身が所有するパブリックホストゾーンID（CloudFrontのAliasレコード登録先）"
+  "FqdnForCloudFront", "CloudFrontのAliasレコードを登録するときのFQDN", "ご自身で登録したいFQDN"
+  "BucketName", "CloudFrontのオリジン用S3バケット名", "デプロイしたS3バケット名"
+  "BucketArn", "CloudFrontのオリジン用S3バケットARN", "デプロイしたS3バケットARN"
+  "BucketRegionalDomainName", "CloudFrontのオリジン用S3バケットリージョナルドメイン名", "デプロイしたS3バケットリージョナルドメイン名"
 
 後片付け - ローカル -
 =====================================================================
@@ -103,18 +103,7 @@
 
   aws s3 rm --recursive s3://デプロイしたS3バケット名 --profile admin
 
-2. *tokyostack* 削除
----------------------------------------------------------------------
-.. code-block:: bash
-
-  rain rm TOKYOSTACK --profile admin
-
-.. note::
-
-  * tokyostack削除後、 *DNS検証* で自動作成されたALB用証明書の *CNAMEレコード* は残る
-  * そのため、不要なら手動で *CNAMEレコード* を削除すること
-
-3. *virginiastack* 削除
+2. *virginiastack* 削除
 ---------------------------------------------------------------------
 .. code-block:: bash
 
@@ -123,6 +112,17 @@
 .. note::
 
   * virginiastack削除後、 *DNS検証* で自動作成されたCloudFront用証明書の *CNAMEレコード* は残る
+  * そのため、不要なら手動で *CNAMEレコード* を削除すること
+
+3. *tokyostack* 削除
+---------------------------------------------------------------------
+.. code-block:: bash
+
+  rain rm TOKYOSTACK --profile admin
+
+.. note::
+
+  * tokyostack削除後、 *DNS検証* で自動作成されたALB用証明書の *CNAMEレコード* は残る
   * そのため、不要なら手動で *CNAMEレコード* を削除すること
 
 4. デプロイ用S3バケット作成(東京リージョン)削除
