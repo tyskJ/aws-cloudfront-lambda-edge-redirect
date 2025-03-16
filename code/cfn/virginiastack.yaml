@@ -62,6 +62,7 @@ Parameters:
 # ║ CloudFrontRecordSet                 │ AWS::Route53::RecordSet                   │ Alias RecordSet for CloudFront.                                ║
 # ║ BucketPolicy                        │ AWS::S3::BucketPolicy                     │ S3 Bucket Policy.                                              ║
 # ║ IamPolicy                           │ AWS::IAM::ManagedPolicy                   │ IAM Managed Policy for Lambda@Edge.                            ║
+# ║ IamRole                             │ AWS::IAM::Role                            │ IAM Role for Lambda@Edge.                                      ║
 # ╚═════════════════════════════════════╧═══════════════════════════════════════════╧════════════════════════════════════════════════════════════════╝
 Resources:
   CloudFrontCert:
@@ -185,6 +186,30 @@ Resources:
                       "Fn::Sub": "arn:${AWS::Partition}:logs:*:${AWS::AccountId}:log-group:/aws/lambda/us-east-1*",
                     },
                   ],
+              },
+            ],
+        }
+
+  IamRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Description: IAM Role for Lambda@Edge.
+      ManagedPolicyArns:
+        - !Ref IamPolicy
+      RoleName: iam-role-for-lambdaedge
+      AssumeRolePolicyDocument:
+        {
+          "Version": "2012-10-17",
+          "Statement":
+            [
+              {
+                "Effect": "Allow",
+                "Principal":
+                  {
+                    "Service":
+                      ["lambda.amazonaws.com", "edgelambda.amazonaws.com"],
+                  },
+                "Action": "sts:AssumeRole",
               },
             ],
         }
