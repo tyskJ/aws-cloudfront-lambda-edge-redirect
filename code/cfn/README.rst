@@ -74,11 +74,28 @@
   aws s3 cp index.html s3://デプロイしたS3バケット名 --profile admin
   aws s3 cp error.html s3://デプロイしたS3バケット名 --profile admin
 
-3. *virginiastack* デプロイ
+3. Python3の文字エンコーディング設定を *UTF-8* に変更
 ---------------------------------------------------------------------
 .. code-block:: bash
 
-  rain deploy virginiastack.yaml VIRGINIASTACK \
+  PYTHONUTF8=1
+  export PYTHONUTF8
+
+4. アーティファクト(Lambda関数コード)をS3にアップロード
+---------------------------------------------------------------------
+.. code-block:: bash
+
+  aws cloudformation package \
+  --template-file virginiastack.yaml \
+  --s3-bucket cfn-$DATE-useast1 \
+  --region us-east-1 \
+  --output-template-file virginiastack-out.yaml --profile admin
+
+5. *virginiastack* デプロイ
+---------------------------------------------------------------------
+.. code-block:: bash
+
+  rain deploy virginiastack-out.yaml VIRGINIASTACK \
   --s3-bucket cfn-$DATE-useast1 \
   --region us-east-1 --profile admin
 
