@@ -1,6 +1,27 @@
 #!/usr/bin/env node
 import * as cdk from "aws-cdk-lib";
-import { CdkAppStack } from "../lib/stack/cdk-app-stack";
+import { devParameter } from "../parameter";
+import { VirginiaStack } from "../lib/stack/virginiaStack";
+import { TokyoStack } from "../lib/stack/tokyoStack";
 
 const app = new cdk.App();
-new CdkAppStack(app, "CdkAppStack", {});
+
+// Virginia Stack
+const virginia = new VirginiaStack(app, "VirginiaStack", {
+  env: { region: "us-east-1" },
+  crossRegionReferences: true,
+  ...devParameter,
+  description: "Virginia Region Stack.",
+});
+cdk.Tags.of(virginia).add("Env", "Virginia");
+
+// Tokyo Stack
+const tokyo = new TokyoStack(app, "TokyoStack", {
+  env: { region: "ap-northeast-1" },
+  crossRegionReferences: true,
+  ...devParameter,
+  cfCert: virginia.CfCertificate,
+  function: virginia.lambdaFn,
+  description: "Tokyo Region Stack.",
+});
+cdk.Tags.of(tokyo).add("Env", devParameter.EnvName);
